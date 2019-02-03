@@ -1,0 +1,16 @@
+<package format="2">
+  <name>ltu_actor_estop</name>
+  <version>0.0.1</version>
+  <description>
+    This package is the last stage in the chain of control of the actor vehicle commands. It stops the car by transmitting a zero speed command every 20ms when asked via service or when it detects a hardware button push. It can only be disabled through a service call.
+  </description>
+  <maintainer email="mpleune@ltu.edu">Mitchell Pleune</maintainer>
+  <license>UNLICENSED</license>
+  <url>https://github.com/LTU-Actor/eStop</url>
+
+  <buildtool_depend>catkin</buildtool_depend>
+
+  <depend>roscpp</depend>
+  <depend>std_srvs</depend>
+  <depend>geometry_msgs</depend>
+</package>
