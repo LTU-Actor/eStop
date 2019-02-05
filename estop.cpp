@@ -77,15 +77,19 @@ main(int argc, char **argv)
     ros::init(argc, argv, "eStop");
     ros::NodeHandle nh("~");
 
-    std::string forwarded_topic;
-    if (!nh.getParam("forwarded_topic", forwarded_topic))
+    std::string input_topic, output_topic;
+
+    if (!nh.getParam("input_topic", input_topic))
     {
         ROS_ERROR_STREAM("eStop forwarded topic not specified");
         return EXIT_FAILURE;
     }
 
-    pub = nh.advertise<geometry_msgs::Twist>("out", 1);
-    ros::Subscriber forwarded = nh.subscribe(forwarded_topic, 1, &forwarded_cb);
+    if (!nh.getParam("output_topic", output_topic))
+        output_topic = "out";
+
+    pub = nh.advertise<geometry_msgs::Twist>(output_topic, 1);
+    ros::Subscriber forwarded = nh.subscribe(input_topic, 1, &forwarded_cb);
     ros::ServiceServer srv_stop = nh.advertiseService("stop", &stop);
     ros::ServiceServer srv_restart = nh.advertiseService("resume", &resume);
     zeros = nh.createTimer(ros::Duration(1.0 / ZEROS_HZ), &publish_zero);
