@@ -11,6 +11,12 @@ Forwards a `geometry_msgs/Twist`, or publishes all zeros at 50 hz
 - Specify topic to forward in rosparam `~input_topic`
 - Publishes output to `~out` by default
   - Can change with `~output_topic` rosparam
+  
+## Required ROS Params
+
+`~input_topic` name of the topoc to subscribe to  
+
+`~output_topic` name of the topoc to publish to 
 
 ### Example ROS launch file
 
