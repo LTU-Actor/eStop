@@ -15,16 +15,21 @@
 
 enum EstopState { RUNNING, STOPPED } static state = STOPPED;
 
+static void stop(void);
+
 static bool stop_cb(ros::ServiceEvent<std_srvs::EmptyRequest, std_srvs::EmptyResponse> &event);
 static bool resume_cb(ros::ServiceEvent<std_srvs::TriggerRequest, std_srvs::TriggerResponse> &event);
 static void forwarded_cb(const geometry_msgs::Twist::ConstPtr &msg);
 static void publish_zero_cb(const ros::TimerEvent);
 static void publish_state_cb(const ros::TimerEvent);
+static void timeout_cb(const ros::TimerEvent);
 
 static std::string resume_node; // node name with resume permission
 static ros::Publisher pub_twist; // Output Twist publisher
 static ros::Publisher pub_state; // Periodic state publisher
 static ros::Timer zeros; // publish zeros when enabled
+
+static ros::Time last_recv;
 
 int
 main(int argc, char **argv)
@@ -49,20 +54,28 @@ main(int argc, char **argv)
     ros::ServiceServer srv_restart = nh.advertiseService("resume", &resume_cb);
     zeros = nh.createTimer(ros::Duration(1.0 / ZEROS_HZ), &publish_zero_cb);
 
+    last_recv = ros::Time::now();
     ros::Timer state = nh.createTimer(ros::Duration(1.0 / STATE_HZ), &publish_state_cb);
+    ros::Timer timeout = nh.createTimer(ros::Duration(1.0 / 50), &timeout_cb);
 
     ros::spin();
     return EXIT_SUCCESS;
 }
 
-static bool
-stop_cb(ros::ServiceEvent<std_srvs::EmptyRequest, std_srvs::EmptyResponse> &event)
+static void
+stop()
 {
     state = STOPPED;
     zeros.start();
     std_msgs::Bool msg;
     msg.data = true;
     pub_state.publish(msg);
+}
+
+static bool
+stop_cb(ros::ServiceEvent<std_srvs::EmptyRequest, std_srvs::EmptyResponse> &event)
+{
+    stop();
     return true;
 }
 
@@ -95,6 +108,7 @@ resume_cb(ros::ServiceEvent<std_srvs::TriggerRequest, std_srvs::TriggerResponse>
 static void
 forwarded_cb(const geometry_msgs::Twist::ConstPtr &msg)
 {
+    last_recv = ros::Time::now();
     if (state == RUNNING) pub_twist.publish(msg);
 }
 
@@ -117,4 +131,11 @@ publish_state_cb(const ros::TimerEvent)
     std_msgs::Bool msg;
     msg.data = (state == STOPPED);
     pub_state.publish(msg);
+}
+
+static void
+timeout_cb(const ros::TimerEvent)
+{
+    if ((ros::Time::now() - last_recv) > ros::Duration(1.0))
+        stop();
 }
