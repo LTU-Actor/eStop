@@ -10,6 +10,7 @@
 // The eStop node starts in the stopped state, so the node that initially
 // resumes must be the same node that does it in the future.
 
+#define REPUB_HZ 50
 #define ZEROS_HZ 50
 #define STATE_HZ 0.5
 
@@ -19,8 +20,9 @@ static void stop(void);
 
 static bool stop_cb(ros::ServiceEvent<std_srvs::EmptyRequest, std_srvs::EmptyResponse> &event);
 static bool resume_cb(ros::ServiceEvent<std_srvs::TriggerRequest, std_srvs::TriggerResponse> &event);
-static void forwarded_cb(const geometry_msgs::Twist::ConstPtr &msg);
+static void forwarded_cb(const geometry_msgs::Twist::ConstPtr &msg);;
 static void publish_zero_cb(const ros::TimerEvent);
+static void publish_repub_cb(const ros::TimerEvent);
 static void publish_state_cb(const ros::TimerEvent);
 static void timeout_cb(const ros::TimerEvent);
 
@@ -28,8 +30,10 @@ static std::string resume_node; // node name with resume permission
 static ros::Publisher pub_twist; // Output Twist publisher
 static ros::Publisher pub_state; // Periodic state publisher
 static ros::Timer zeros; // publish zeros when enabled
+static ros::Timer repub;
 
 static ros::Time last_recv;
+static geometry_msgs::Twist last_to_repub;
 
 int
 main(int argc, char **argv)
@@ -51,8 +55,11 @@ main(int argc, char **argv)
     pub_state = nh.advertise<std_msgs::Bool>("state", 1);
     ros::Subscriber forwarded = nh.subscribe(input_topic, 1, &forwarded_cb);
     ros::ServiceServer srv_stop = nh.advertiseService("stop", &stop_cb);
-    ros::ServiceServer srv_restart = nh.advertiseService("resume", &resume_cb);
+    ros::ServiceServer srv_restart = nh.advertiseService("resume", &resume_cb);;
     zeros = nh.createTimer(ros::Duration(1.0 / ZEROS_HZ), &publish_zero_cb);
+    repub = nh.createTimer(ros::Duration(1.0 / REPUB_HZ), &publish_repub_cb);
+    repub.stop();
+    zeros.start();
 
     last_recv = ros::Time::now();
     ros::Timer state = nh.createTimer(ros::Duration(1.0 / STATE_HZ), &publish_state_cb);
@@ -66,6 +73,7 @@ static void
 stop()
 {
     state = STOPPED;
+    repub.stop();
     zeros.start();
     std_msgs::Bool msg;
     msg.data = true;
@@ -95,6 +103,8 @@ resume_cb(ros::ServiceEvent<std_srvs::TriggerRequest, std_srvs::TriggerResponse>
     {
         state = RUNNING;
         zeros.stop();
+        last_to_repub = geometry_msgs::Twist();
+        repub.start();
         response.message = "";
         response.success = true;
     }
@@ -109,6 +119,7 @@ static void
 forwarded_cb(const geometry_msgs::Twist::ConstPtr &msg)
 {
     last_recv = ros::Time::now();
+    last_to_repub = *msg;
     if (state == RUNNING) pub_twist.publish(msg);
 }
 
@@ -123,6 +134,12 @@ publish_zero_cb(const ros::TimerEvent)
     msg.linear.y = 0;
     msg.linear.z = 0;
     pub_twist.publish(msg);
+}
+
+static void
+publish_repub_cb(const ros::TimerEvent)
+{
+  pub_twist.publish(last_to_repub);
 }
 
 static void
