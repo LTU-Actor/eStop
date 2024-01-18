@@ -1,5 +1,6 @@
 #include <cstdlib>
 #include <geometry_msgs/Twist.h>
+#include <dbw_polaris_msgs/BrakeCmd.h>
 #include <ros/ros.h>
 #include <std_msgs/Bool.h>
 #include <std_srvs/Empty.h>
@@ -28,6 +29,7 @@ static void timeout_cb(const ros::TimerEvent);
 
 static std::string resume_node; // node name with resume permission
 static ros::Publisher pub_twist; // Output Twist publisher
+static ros::Publisher pub_brake; // Output BrakeCmd publisher
 static ros::Publisher pub_state; // Periodic state publisher
 static ros::Timer zeros; // publish zeros when enabled
 static ros::Timer repub;
@@ -41,7 +43,7 @@ main(int argc, char **argv)
     ros::init(argc, argv, "eStop");
     ros::NodeHandle nh("~");
 
-    std::string input_topic, output_topic;
+    std::string input_topic, output_topic, output_brake_topic;
 
     if (!nh.getParam("input_topic", input_topic))
     {
@@ -52,6 +54,8 @@ main(int argc, char **argv)
     if (!nh.getParam("output_topic", output_topic)) output_topic = "out";
 
     pub_twist = nh.advertise<geometry_msgs::Twist>(output_topic, 1);
+    nh.getParam("output_brake_topic", output_brake_topic);
+    pub_brake = nh.advertise<dbw_polaris_msgs::BrakeCmd>(output_brake_topic, 1);
     pub_state = nh.advertise<std_msgs::Bool>("state", 1);
     ros::Subscriber forwarded = nh.subscribe(input_topic, 1, &forwarded_cb);
     ros::ServiceServer srv_stop = nh.advertiseService("stop", &stop_cb);
@@ -84,6 +88,14 @@ static bool
 stop_cb(ros::ServiceEvent<std_srvs::EmptyRequest, std_srvs::EmptyResponse> &event)
 {
     stop();
+
+    // Actively apply brakes to stop faster
+    dbw_polaris_msgs::BrakeCmd brake_msg;
+    brake_msg.enable = true; // Enables brakes
+    brake_msg.pedal_cmd_type = 2; //PERCENT of max torque
+    brake_msg.pedal_cmd = 0.3; // Brake pedal value
+    pub_brake.publish(brake_msg);
+
     return true;
 }
 

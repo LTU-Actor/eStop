@@ -6,6 +6,7 @@ find_package(catkin REQUIRED
     roscpp
     std_srvs
     geometry_msgs
+    dbw_polaris_msgs
 )
 
 catkin_package(
